@@ -1,0 +1,176 @@
+import pexpect
+import getpass
+import time
+import os
+import datetime
+import sys
+
+def viewfilter(session, promptfw, filename):
+        print('Current Firewall Filters ')
+        time.sleep(1)
+        session.sendline('debug dataplane packet-diag show setting')
+        session.expect(promptfw)
+        sanitize_output(session.before.decode('utf-8'), filename)
+        time.sleep(3)
+
+def editfilter(session, promptfw, filename):
+    print("\t\t\t******************PACKET CAPTURE MENU*********************")
+    time.sleep(1)
+    print()
+    choice = input("""
+                        1: Add Filters for packet Capture
+                        2: Delete Filters for packet Capture
+                        0: Quit Packet Capture Menu
+                        
+
+                        Please enter your choice: """)
+    print()
+    if choice == '1' :
+        addfilter(session, promptfw, filename)
+    elif choice == '2' :
+        delfilter(session, promptfw, filename)
+    elif choice == '0' :
+        exit
+    else:
+        print("Please select 1,2 or 0 options to continue ")
+        editfilter(session, promptfw, filename)
+
+def addfilter(session, promptfw, filename):
+    pass
+
+def delfilter(session, promptfw, filename):
+    pass
+
+
+def gcnofilter(session, promptfw, filename, duration, interval):
+    cycle = int(duration/interval)
+    for c in range(1,cycle + 1):
+        print(f'Iteration : {c}')
+        session.sendline('show clock')
+        session.expect(promptfw)
+        sanitize_output(session.before.decode('utf-8'), filename)
+        session.sendline('show running resource-monitor')
+        session.expect(promptfw)
+        sanitize_output(session.before.decode('utf-8'), filename)
+        session.sendline('show counter global filter delta yes')
+        session.expect(promptfw)
+        sanitize_output(session.before.decode('utf-8'), filename)
+        time.sleep(interval)
+
+def gcwithfilter(session, promptfw, filename, duration, interval):
+    cycle = int(duration/interval)
+    for c in range(1,cycle + 1):
+        print(f'Iteration : {c}')
+        session.sendline('show clock')
+        session.expect(promptfw)
+        sanitize_output(session.before.decode('utf-8'), filename)
+        session.sendline('show running resource-monitor')
+        session.expect(promptfw)
+        sanitize_output(session.before.decode('utf-8'), filename)
+        session.sendline('show counter global filter packet-filter yes delta yes')
+        session.expect(promptfw)
+        sanitize_output(session.before.decode('utf-8'), filename)
+        time.sleep(interval)
+
+
+def sanitize_output(feed, filename):
+    output = ''
+    output += feed
+    file_log = open(filename, 'a')
+    for line in output.split('\n'):
+        if '@' not in line:
+            print(line)
+            file_log.write(line)
+    file_log.close()
+
+
+        
+
+
+
+def MainMenu(session, promptfw, filename):
+    print()
+    sys.exit
+    print("\t\t\t******************MAIN MENU*********************")
+    time.sleep(1)
+    print()
+    choice = input("""
+                        a: View Filters for packet Capture
+                        b: Add/Delete Filters for packet Capture
+                        c: Capture Global Counters with filters
+                        d: Capture Global Counters without filters
+                        q: Quit/Logout
+                        
+
+                        Please enter your choice: """)
+    print()
+
+
+    if choice == "A" or choice =="a":
+        viewfilter(session, promptfw, filename)
+    elif choice == "B" or choice =="b":
+        editfilter(session, promptfw, filename)
+    elif choice == "C" or choice =="c":
+        duration = int(input('Total duration of the filters to run: '))
+        interval = int(input('Time Interval after each run: '))
+        gcwithfilter(session, promptfw, filename, duration, interval)
+    elif choice == "D" or choice =="d":
+        duration = int(input('Total duration of the filters to run: '))
+        interval = int(input('Time Interval after each run: '))
+        gcnofilter(session, promptfw, filename, duration, interval)
+    elif choice=="Q" or choice=="q":
+        exit
+        print('Exited the menu, logging out of the firewall too......')
+        session.expect(promptfw)
+        session.sendline('delete admin-sessions username admin')
+        exit()
+    else:
+        print("You must only select either a,b,c, or q. Please try again! ")
+        MainMenu(session, promptfw, filename)
+        
+    
+    print()
+    MainMenu(session, promptfw, filename)
+    
+    
+
+
+
+if __name__ == '__main__':
+    print('Your Curent working Directory is: ', os.getcwd())
+    abspath=input('Provide the absolute path where logging file needs to be created: ')
+
+    if abspath == '':
+        os.chdir(os.path.expanduser('~/Downloads'))
+    else:
+        os.chdir(abspath)
+
+    print('Post providing feedback your current working dir is: ', os.getcwd())
+    curr_time = str(datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S'))
+    filename = curr_time + '.' + 'log'
+    print('Name of the file where logging will be done: ', filename)
+
+
+    username = input('Please enter your corp username: ')
+    password = getpass.getpass(prompt = 'Please enter your corp Password: ')
+    fwid = input('Please provide the fqdn/ip of the ngfw Firewall: ')
+
+    promptfw = '> $'
+    promptos = '\$ $'
+
+    
+        
+
+
+    session = pexpect.spawn('ssh ' + username + '@' + fwid )
+    session.expect('Password: ')
+    session.sendline(password)
+    session.sendline('set cli pager off')
+    session.expect(promptfw)
+    sanitize_output(session.before.decode('utf-8'), filename)
+    session.sendline('set cli scripting-mode on')
+    session.expect(promptfw)
+    sanitize_output(session.before.decode('utf-8'), filename)
+    MainMenu(session, promptfw, filename)
+
+   
